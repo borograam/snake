@@ -3,6 +3,56 @@
 		<title>Snake</title>
 	</head>
 	<body>
-		
+		<div id="field"></div>
+		<script>
+			let createElementMatrix = field => {
+				field.matrix = new Array(field.height)
+					.fill(0)
+					.map(tr => new Array(field.width)
+						.fill(0)
+						.map(td => document.createElement('td'))
+					);
+			};
+			
+			let renderTable = field => field.matrix
+				.map(
+					row => row.reduce(
+						(tr, td) => tr.appendChild(td) && tr,
+						document.createElement('tr')
+					)
+				).reduce(
+					(table, tr) => table.appendChild(tr) && table,
+					document.createElement('table')
+				);
+			
+			let prepareAGame = field => {
+				createElementMatrix(field);
+				
+				let table = renderTable(field);
+				table.cellSpacing = 0;
+				field.div.innerHTML = "";
+				field.div.appendChild(table);
+			};
+			
+			let field = {
+				div: document.getElementById('field'),
+				width: 10,
+				height: 10
+			};
+			
+			prepareAGame(field);
+		</script>
+		<style>
+			td {
+				border-right: 1px solid black;
+				border-bottom: 1px solid black;
+				width:25px;
+				height:25px;
+			}
+			table {
+				border-left: 1px solid black;
+				border-top: 1px solid black;
+			}
+		</style>
 	</body>
 </html>
