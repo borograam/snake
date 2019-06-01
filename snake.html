@@ -5,42 +5,71 @@
 	<body>
 		<div id="field"></div>
 		<script>
-			let createElementMatrix = field => {
-				field.matrix = new Array(field.height)
-					.fill(0)
-					.map(tr => new Array(field.width)
-						.fill(0)
-						.map(td => document.createElement('td'))
-					);
-			};
-			
-			let renderTable = field => field.matrix
-				.map(
-					row => row.reduce(
-						(tr, td) => tr.appendChild(td) && tr,
-						document.createElement('tr')
-					)
-				).reduce(
-					(table, tr) => table.appendChild(tr) && table,
-					document.createElement('table')
-				);
-			
-			let prepareAGame = field => {
-				createElementMatrix(field);
+			class Controller {
+				constructor(field) {
+					if (!field || !field.width || !field.height || !field.div)
+						throw Error();
+					this.field = field;
+				}
 				
-				let table = renderTable(field);
-				table.cellSpacing = 0;
-				field.div.innerHTML = "";
-				field.div.appendChild(table);
-			};
+				createElementMatrix() {
+					return this.field.matrix = new Array(this.field.height)
+						.fill(0)
+						.map(tr => new Array(this.field.width)
+							.fill(0)
+							.map(td => document.createElement('td'))
+						);
+				}
 			
-			let field = {
+				renderTable() {
+					return this.field.matrix
+						.map(
+							row => row.reduce(
+								(tr, td) => tr.appendChild(td) && tr,
+								document.createElement('tr')
+							)
+						).reduce(
+							(table, tr) => table.appendChild(tr) && table,
+							document.createElement('table')
+						);
+				}
+				
+							
+				swapCells(coord1, coord2) {
+					let getTdFromCoord = coord => this.field.matrix[coord.y][coord.x];
+					let getTrFromTd = td => td.parentNode;
+					let [td1, td2] = [coord1, coord2].map(getTdFromCoord);
+					let [tr1, tr2] = [td1, td2].map(getTrFromTd);
+					tr1.replaceChild(td2, td1);
+					if (coord2.x < this.field.width - 1)
+						tr2.insertBefore(
+							td1,
+							getTdFromCoord({
+								x: coord2.x + 1,
+								y: coord2.y
+							})
+						);
+					else tr2.appendChild(td1);
+					this.field.matrix[coord1.y][coord1.x] = td2;
+					this.field.matrix[coord2.y][coord2.x] = td1;
+				}
+			
+				prepareAGame() {
+					this.createElementMatrix();
+					
+					let table = this.renderTable();
+					table.cellSpacing = 0;
+					this.field.div.innerHTML = "";
+					this.field.div.appendChild(table);
+				}
+			}
+			
+			let c = new Controller({
 				div: document.getElementById('field'),
 				width: 10,
 				height: 10
-			};
-			
-			prepareAGame(field);
+			});
+			c.prepareAGame();
 		</script>
 		<style>
 			td {
