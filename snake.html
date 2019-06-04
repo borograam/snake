@@ -1,272 +1,276 @@
 <html>
-	<head>
-		<title>Snake</title>
-	</head>
-	<body>
-		<div id="field"></div>
-		<script>			
-			class Vertex {
-				constructor(x, y) {
-					this.x = x;
-					this.y = y;
-					this.connections = {};
-					
-					this.el = null;
-					this.type = "none";  // enum?  none, snake, head, apple
-				}
-				connect(key, vertex){
-					this.connections[key] = vertex;
-				}
-				[Symbol.iterator](){
-					let needToCheck = [];
-					let connections = this.connections;
-					for(let key in this.connections) needToCheck.push(key);
-					return {
-						next(){
-							let key = needToCheck.pop();
-							while(key !== undefined){
-								if(connections[key].canReach()) 
-									return {done: false, value: {key, value: connections[key]}};
-								key = needToCheck.pop();
-							}
-							return {done: true, value: undefined};
-						}
-					}
-				}
-				clear() {
-					this.el = null;
-					this.type = "none";
-				}
-				canReach() {
-					if (!this.el) return true;
-					if (this.type === "apple") return true;
-					return false;
-				}
-				copyStateTo(vertex) {
-					vertex.el = this.el;
-					vertex.type = this.type;
-				}
-				toString() {
-					return `Vertex (${this.x}, ${this.y})`;
-				}
-			}
-			
-			class Graph {
-				constructor(width, height) {
-					this.matrix = new Array(width)
-						.fill(0)
-						.map((col, x) => new Array(height)
-							.fill(0)
-							.map((cell, y) => new Vertex(x, y)));
-					for(let x = 0; x < width; x++)
-						for(let y = 0; y < height; y++) {
-							let v = this.matrix[x][y];
-							if(y != 0) v.connect('u', this.matrix[x][y - 1]);
-							if(x != width - 1) v.connect('r', this.matrix[x + 1][y]);
-							if(y != height - 1) v.connect('d', this.matrix[x][y + 1]);
-							if(x != 0) v.connect('l', this.matrix[x - 1][y]);
-						}
-				}
-				randomEmptyVertex(setType='snake') {
-					let arr = this.matrix.flatMap(i => i).filter(v => !v.el);
-					let ret = arr[Math.floor(Math.random() * arr.length)];
-					ret.type = setType;
-					return ret;
-				}
-			}
-			
-			class Controller {
-				constructor(obj) {
-					if (!obj || !obj.rows || !obj.cols || !obj.wrap) throw new Error();
-					this.rows = obj.rows;
-					this.cols = obj.cols;
-					this.wrap = obj.wrap;
-					this.list = [];
-					this.apple = null;  // apple vertex
-					
-					this.initList();  // list of snake parts (divs)
-					this.createApple(this.graph.randomEmptyVertex());
-					this.actionQueue = [];
-					this.writeTopLeft();
-					
-					//add head and apple
-				}
-				createDiv(vertex, classes=[]) {
-					let div = document.createElement('div');
-					for(let cls of classes) div.classList.add(cls);
-					this.wrap.appendChild(div);
-					vertex.el = div;
-					div.v = vertex;
-					return div;
-				}
-				removeDiv(div) {
-					let ret = div.v.clear();
-					div.parentNode.removeChild(div);
-					this.list = this.list.filter(d => (d !== div));
-				}
-				createApple(vertex) {
-					let div = this.createDiv(vertex, ['apple']);
-					this.apple = vertex;
-					vertex.type = "apple";
-					return div;
-				}
-				updateApple(div, vertex) {
-					vertex.el = div;
-					div.v = vertex;
-					this.apple = vertex;
-					vertex.type = "apple";
-					return div;
-				}
-				createSnakePart(vertex) {
-					let div = this.createDiv(vertex, ['snakePart']);
-					vertex.type == "snake";
-					return div;
-				}
-				createSnakeHead(vertex) {
-					let div = this.createDiv(vertex, ['snakePart', 'snakeHead']);
-					vertex.type == "head";
-					return div;
-				}
-				createSnakeTail(vertex) {
-					let div = this.createSnakePart(vertex);
-					this.list.push(div);
-					return div;
-				}
-				initList() {
-					// delete all existing elements
-					for(let div of this.wrap.getElementsByClassName('snakePart'))
-						this.removeDiv(div);
-					this.graph = new Graph(this.rows, this.cols);
-					let head = this.createSnakeHead(this.graph.randomEmptyVertex());
-					
-					this.list = [head];
-				}
-				/*
-				todo about algorithm
-				sometimes tactic can change if some moves are complete
-				
-				*/
-				computePathWidth(vertexFrom, vertexTo) {
-					let from = {},
-						visited = {},
-						vertexQueue = [vertexFrom];
-					
-					while(vertexQueue.length){
-						let cur = vertexQueue.shift();
-						if (cur === vertexTo) break;
-						for (let next of cur) {
-							if (!visited[next.value]) {
-								vertexQueue.push(next.value);
-								visited[next.value] = true;
-								from[next.value] = {el: cur, action: next.key};
-							}
-						}
-					}
-					//console.log(from);
-					let path = [];
-					if (!from[vertexTo]){
-						//there is no path between 'from' and 'to'
-						//the snake is in panic, so choose path randomly 
-						for(let next of vertexFrom) return [next.key]
-						return [];
-					}
-					for(let vert = vertexTo; vert !== vertexFrom; vert = from[vert].el)
-						path.unshift(from[vert].action);
-					return path;
-				}
-				addPath(arr) {
-					for(let c of arr) this.actionQueue.push(c);
-					console.log("Add path: " + arr.reduce((a, b) => `${a}, ${b}`));
-				}
-				getAction(fn=this.computePathWidth) {
-					if(!this.actionQueue.length) {
-						let newPath = fn(this.list[0].v, this.apple);
-						if (newPath.length) this.addPath(newPath);
-						else return null;
-					}
-					return this.actionQueue.shift();
-				}
-				
-				writeTopLeft() {
-					this.graph.matrix.forEach((col, x) => {
-						col.forEach((cell, y) => {
-							if (cell.el) {
-								cell.el.style.top = (y * 20) + 'px';
-								cell.el.style.left = (x * 20) + 'px';
-							}
-						});
-					});
-				}
-				move(action) {  // todo history, stats, serialization game process
-					let headVertex = this.list[0].v;
-					if(!headVertex.connections[action]) {
-						log.error(`Can't do "${action}" action, vertex (${headVertex.x}, ${headVertex.y}) doesn't have this move`);
-						return {ok: false};
-					}
-					let nextHeadVertex = headVertex.connections[action];
-					let eatApple = nextHeadVertex.type === "apple";
-					headVertex.copyStateTo(nextHeadVertex);
-					this.list[0].v = nextHeadVertex;
-					let lastVertex = headVertex;
-					for(let i = 1; i < this.list.length; i++){
-						this.list[i].v.copyStateTo(lastVertex);
-						let temp = lastVertex;
-						lastVertex = this.list[i].v;
-						this.list[i].v = temp;
-					}
-					if(eatApple) this.createSnakeTail(lastVertex);
-					else lastVertex.clear();
-					let ret = {ok: true, appleEaten: eatApple};
-					return ret;
-				}
-				step() {
-					let action = this.getAction();
-					if(!action) {
-						console.log('Game over');
-						return;
-					}
-					let result = this.move(action);
-					if (result.appleEaten){
-						let appleDiv = this.wrap.getElementsByClassName('apple')[0];
-						let newPlace = this.graph.randomEmptyVertex();
-						if(appleDiv) this.updateApple(appleDiv, newPlace);
-						else this.createApple(newPlace);
-					}
-					this.writeTopLeft();
-				}
-			}
-			
-			let c = new Controller({
-				rows: 10, 
-				cols: 10, 
-				wrap: document.getElementById('field')
-			});
-			setInterval("c.step()", 400);
-		</script>
-		<style>
-			.snakePart {
-				border-radius: 50%;
-				width: 20px; 
-				height: 20px;
-				position: absolute;
-				transition: all .5s linear 0ms;
-				-webkit-transition: all .5s linear 0ms;
-				-moz-transition: all .5s linear 0ms;
-				-o-transition: all .5s linear 0ms;
-				background-color: #DDDDDD;
-				z-index: 101;
-			}
-			.snakeHead {
-				background-color: #FFDDDD;
-			}
-			.apple {
-				border-radius: 50%;
-				width: 20px; 
-				height: 20px;
-				position: absolute;
-				background-color: #DDFFDD;
-				z-index: 100;
-			}
-		</style>
-	</body>
+    <head>
+        <meta charset="utf-8">
+        <title>Snake</title>
+    </head>
+    <body>
+        <div id="field"></div>
+        <script>            
+            class Vertex {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                    this.connections = {};
+                    
+                    this.el = null;
+                    this.type = "none";  // enum?  none, snake, head, apple
+                }
+                connect(key, vertex){
+                    this.connections[key] = vertex;
+                }
+                [Symbol.iterator](){
+                    let needToCheck = [];
+                    let connections = this.connections;
+                    for(let key in this.connections) needToCheck.push(key);
+                    return {
+                        next(){
+                            let key = needToCheck.pop();
+                            while(key !== undefined){
+                                if(connections[key].canReach()) 
+                                    return {done: false, value: {key, value: connections[key]}};
+                                key = needToCheck.pop();
+                            }
+                            return {done: true, value: undefined};
+                        }
+                    }
+                }
+                clear() {
+                    this.el = null;
+                    this.type = "none";
+                }
+                canReach() {
+                    if (!this.el) return true;
+                    if (this.type === "apple") return true;
+                    return false;
+                }
+                copyStateTo(vertex) {
+                    vertex.el = this.el;
+                    vertex.type = this.type;
+                }
+                toString() {
+                    return `Vertex (${this.x}, ${this.y})`;
+                }
+            }
+            
+            class Graph {
+                constructor(width, height) {
+                    this.matrix = new Array(width)
+                        .fill(0)
+                        .map((col, x) => new Array(height)
+                            .fill(0)
+                            .map((cell, y) => new Vertex(x, y)));
+                    for(let x = 0; x < width; x++)
+                        for(let y = 0; y < height; y++) {
+                            let v = this.matrix[x][y];
+                            if(y != 0) v.connect('u', this.matrix[x][y - 1]);
+                            if(x != width - 1) v.connect('r', this.matrix[x + 1][y]);
+                            if(y != height - 1) v.connect('d', this.matrix[x][y + 1]);
+                            if(x != 0) v.connect('l', this.matrix[x - 1][y]);
+                        }
+                }
+                randomEmptyVertex(setType='snake') {
+                    let arr = this.matrix.flatMap(i => i).filter(v => !v.el);
+                    let ret = arr[Math.floor(Math.random() * arr.length)];
+                    ret.type = setType;
+                    return ret;
+                }
+            }
+            
+            class Controller {
+                constructor(obj) {
+                    if (!obj || !obj.rows || !obj.cols || !obj.wrap) throw new Error();
+                    this.rows = obj.rows;
+                    this.cols = obj.cols;
+                    this.wrap = obj.wrap;
+                    this.list = [];
+                    this.apple = null;  // apple vertex
+                    
+                    this.initList();  // list of snake parts (divs)
+                    this.createApple(this.graph.randomEmptyVertex());
+                    this.actionQueue = [];
+                    this.writeTopLeft();
+                    
+                    //add head and apple
+                }
+                createDiv(vertex, classes=[]) {
+                    let div = document.createElement('div');
+                    for(let cls of classes) div.classList.add(cls);
+                    this.wrap.appendChild(div);
+                    vertex.el = div;
+                    div.v = vertex;
+                    return div;
+                }
+                removeDiv(div) {
+                    //console.log("entered to remove", div);
+                    let ret = div.v.clear();
+                    div.parentNode.removeChild(div);
+                    this.list = this.list.filter(d => (d !== div));
+                    //console.log("removed ", div);
+                }
+                createApple(vertex) {
+                    let div = this.createDiv(vertex, ['apple']);
+                    this.apple = vertex;
+                    vertex.type = "apple";
+                    return div;
+                }
+                updateApple(div, vertex) {
+                    vertex.el = div;
+                    div.v = vertex;
+                    this.apple = vertex;
+                    vertex.type = "apple";
+                    return div;
+                }
+                createSnakePart(vertex) {
+                    let div = this.createDiv(vertex, ['snakePart']);
+                    vertex.type == "snake";
+                    return div;
+                }
+                createSnakeHead(vertex) {
+                    let div = this.createDiv(vertex, ['snakePart', 'snakeHead']);
+                    vertex.type == "head";
+                    return div;
+                }
+                createSnakeTail(vertex) {
+                    let div = this.createSnakePart(vertex);
+                    this.list.push(div);
+                    return div;
+                }
+                initList() {
+                    // delete all existing elements
+                    let existingSnakeParts = this.wrap.getElementsByClassName('snakePart');
+                    for(let i = existingSnakeParts.length - 1; i >= 0; i--) this.removeDiv(existingSnakeParts[i]);
+                    this.graph = new Graph(this.rows, this.cols);
+                    let head = this.createSnakeHead(this.graph.randomEmptyVertex());
+                    
+                    this.list = [head];
+                }
+                /*
+                todo about algorithm
+                sometimes tactic can change if some moves will complete
+                
+                */
+                computePathWidth(vertexFrom, vertexTo) {
+                    let from = {},
+                        visited = {},
+                        vertexQueue = [vertexFrom];
+                    
+                    while(vertexQueue.length){
+                        let cur = vertexQueue.shift();
+                        if (cur === vertexTo) break;
+                        for (let next of cur) {
+                            if (!visited[next.value]) {
+                                vertexQueue.push(next.value);
+                                visited[next.value] = true;
+                                from[next.value] = {el: cur, action: next.key};
+                            }
+                        }
+                    }
+                    //console.log(from);
+                    let path = [];
+                    if (!from[vertexTo]){
+                        //there is no path between 'from' and 'to'
+                        //the snake is in panic, so choose path randomly 
+                        for(let next of vertexFrom) return [next.key]
+                        return [];
+                    }
+                    for(let vert = vertexTo; vert !== vertexFrom; vert = from[vert].el)
+                        path.unshift(from[vert].action);
+                    return path;
+                }
+                addPath(arr) {
+                    for(let c of arr) this.actionQueue.push(c);
+                    console.log("Add path: " + arr.reduce((a, b) => `${a}, ${b}`));
+                }
+                getAction(fn=this.computePathWidth) {
+                    if(!this.actionQueue.length) {
+                        let newPath = fn(this.list[0].v, this.apple);
+                        if (newPath.length) this.addPath(newPath);
+                        else return null;
+                    }
+                    return this.actionQueue.shift();
+                }
+                
+                writeTopLeft() {
+                    this.graph.matrix.forEach((col, x) => {
+                        col.forEach((cell, y) => {
+                            if (cell.el) {
+                                cell.el.style.top = (y * 20) + 'px';
+                                cell.el.style.left = (x * 20) + 'px';
+                            }
+                        });
+                    });
+                }
+                move(action) {  //  history, stats, serialization game process
+                    let headVertex = this.list[0].v;
+                    if(!headVertex.connections[action]) {
+                        log.error(`Can't do "${action}" action, vertex (${headVertex.x}, ${headVertex.y}) doesn't have this move`);
+                        return {ok: false};
+                    }
+                    let nextHeadVertex = headVertex.connections[action];
+                    let eatApple = nextHeadVertex.type === "apple";
+                    headVertex.copyStateTo(nextHeadVertex);
+                    this.list[0].v = nextHeadVertex;
+                    let lastVertex = headVertex;
+                    for(let i = 1; i < this.list.length; i++){
+                        this.list[i].v.copyStateTo(lastVertex);
+                        let temp = lastVertex;
+                        lastVertex = this.list[i].v;
+                        this.list[i].v = temp;
+                    }
+                    if(eatApple) this.createSnakeTail(lastVertex);
+                    else lastVertex.clear();
+                    let ret = {ok: true, appleEaten: eatApple};
+                    return ret;
+                }
+                step() {
+                    let action = this.getAction();
+                    if(!action) {
+                        console.log('Game over');
+                        return;
+                    }
+                    let result = this.move(action);
+                    if (result.appleEaten){
+                        let appleDiv = this.wrap.getElementsByClassName('apple')[0];
+                        let newPlace = this.graph.randomEmptyVertex();
+                        if(appleDiv) this.updateApple(appleDiv, newPlace);
+                        else this.createApple(newPlace);
+                    }
+                    this.writeTopLeft();
+                }
+            }
+            
+            let c = new Controller({
+                rows: 50, 
+                cols: 30, 
+                wrap: document.getElementById('field')
+            });
+            let interval = setInterval("c.step()", 100);
+        </script>
+        <style>
+            .snakePart {
+                border-radius: 50%;
+                width: 20px; 
+                height: 20px;
+                position: absolute;
+                transition: all .3s linear 0ms;
+                -webkit-transition: all .3s linear 0ms;
+                -moz-transition: all .3s linear 0ms;
+                -o-transition: all .3s linear 0ms;
+                background-color: #DDDDDD;
+                z-index: 101;
+            }
+            .snakeHead {
+                background-color: #FFDDDD;
+
+            }
+            .apple {
+                border-radius: 50%;
+                width: 20px; 
+                height: 20px;
+                position: absolute;
+                background-color: #DDFFDD;
+                z-index: 100;
+            }
+        </style>
+    </body>
 </html>
