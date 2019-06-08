@@ -4,7 +4,8 @@
         <title>Snake</title>
     </head>
     <body>
-        <div id="field"></div>
+        <div id="field1" class="field"></div>
+		<div id="field2" class="field"></div>
         <script>            
             class Vertex {
                 constructor(x, y) {
@@ -34,13 +35,22 @@
                         }
                     }
                 }
+				objOfReachedConnections(steps=0) {
+					let ret = {};
+					for(let key in this.connections) {
+						if(this.connections[key].canReach(steps)) ret[key] = this.connections[key];
+					}
+					return ret;
+				}
                 clear() {
                     this.el = null;
                     this.type = "none";
                 }
-                canReach() {
+                canReach(steps=0) {
                     if (!this.el) return true;
                     if (this.type === "apple") return true;
+					if (this.type === "snake" || this.type === "head")
+						return this.el.list.length - this.el.index < steps + 1;
                     return false;
                 }
                 copyStateTo(vertex) {
@@ -79,19 +89,23 @@
             class Controller {
                 constructor(obj) {
                     if (!obj || !obj.rows || !obj.cols || !obj.wrap) throw new Error();
+					this.elWidth = 20;
+					this.elHeight = 20;
                     this.rows = obj.rows;
                     this.cols = obj.cols;
                     this.wrap = obj.wrap;
                     this.list = [];
                     this.apple = null;  // apple vertex
                     
+					this.wrap.innerHTML = '';
+					this.wrap.style.width = this.elWidth * this.cols;
+					this.wrap.style.height = this.elHeight * this.rows;
                     this.initList();  // list of snake parts (divs)
                     this.createApple(this.graph.randomEmptyVertex());
                     this.actionQueue = [];
                     this.writeTopLeft();
-                    
-                    //add head and apple
                 }
+				
                 createDiv(vertex, classes=[]) {
                     let div = document.createElement('div');
                     for(let cls of classes) div.classList.add(cls);
@@ -101,11 +115,9 @@
                     return div;
                 }
                 removeDiv(div) {
-                    //console.log("entered to remove", div);
                     let ret = div.v.clear();
                     div.parentNode.removeChild(div);
                     this.list = this.list.filter(d => (d !== div));
-                    //console.log("removed ", div);
                 }
                 createApple(vertex) {
                     let div = this.createDiv(vertex, ['apple']);
@@ -128,10 +140,15 @@
                 createSnakeHead(vertex) {
                     let div = this.createDiv(vertex, ['snakePart', 'snakeHead']);
                     vertex.type == "head";
+					this.list = [div];
+					div.list = this.list;
+					div.index = 0;
                     return div;
                 }
                 createSnakeTail(vertex) {
                     let div = this.createSnakePart(vertex);
+					div.list = this.list;
+					div.index = this.list.length;
                     this.list.push(div);
                     return div;
                 }
@@ -139,10 +156,8 @@
                     // delete all existing elements
                     let existingSnakeParts = this.wrap.getElementsByClassName('snakePart');
                     for(let i = existingSnakeParts.length - 1; i >= 0; i--) this.removeDiv(existingSnakeParts[i]);
-                    this.graph = new Graph(this.rows, this.cols);
+                    this.graph = new Graph(this.cols, this.rows);
                     let head = this.createSnakeHead(this.graph.randomEmptyVertex());
-                    
-                    this.list = [head];
                 }
                 /*
                 todo about algorithm
@@ -152,16 +167,18 @@
                 computePathWidth(vertexFrom, vertexTo) {
                     let from = {},
                         visited = {},
-                        vertexQueue = [vertexFrom];
+                        vertexQueue = [{v: vertexFrom, steps: 0}];
                     
                     while(vertexQueue.length){
                         let cur = vertexQueue.shift();
-                        if (cur === vertexTo) break;
-                        for (let next of cur) {
-                            if (!visited[next.value]) {
-                                vertexQueue.push(next.value);
-                                visited[next.value] = true;
-                                from[next.value] = {el: cur, action: next.key};
+                        if (cur.v === vertexTo) break;
+						let curConn = cur.v.objOfReachedConnections(cur.steps);
+                        for (let action in curConn) {
+							let next = curConn[action];
+                            if (!visited[next]) {
+                                vertexQueue.push({v: next, steps: cur.steps + 1});
+                                visited[next] = true;
+                                from[next] = {el: cur.v, action};
                             }
                         }
                     }
@@ -170,7 +187,7 @@
                     if (!from[vertexTo]){
                         //there is no path between 'from' and 'to'
                         //the snake is in panic, so choose path randomly 
-                        for(let next of vertexFrom) return [next.key]
+                        for(let next of vertexFrom) return [next.key]; ////////////!
                         return [];
                     }
                     for(let vert = vertexTo; vert !== vertexFrom; vert = from[vert].el)
@@ -194,8 +211,8 @@
                     this.graph.matrix.forEach((col, x) => {
                         col.forEach((cell, y) => {
                             if (cell.el) {
-                                cell.el.style.top = (y * 20) + 'px';
-                                cell.el.style.left = (x * 20) + 'px';
+                                cell.el.style.top = (y * this.elHeight) + 'px';
+                                cell.el.style.left = (x * this.elWidth) + 'px';
                             }
                         });
                     });
@@ -239,12 +256,19 @@
                 }
             }
             
-            let c = new Controller({
-                rows: 50, 
-                cols: 30, 
-                wrap: document.getElementById('field')
+            let c1 = new Controller({
+                rows: 30, 
+                cols: 50, 
+                wrap: document.getElementById('field1')
             });
-            let interval = setInterval("c.step()", 100);
+            let interval1 = setInterval("c1.step()", 100);
+			
+			/*let c2 = new Controller({
+				rows: 30,
+				cols: 35,
+				wrap: document.getElementById('field2')
+			});
+			let interval2 = setInterval("c2.step()", 200);*/
         </script>
         <style>
             .snakePart {
@@ -252,15 +276,15 @@
                 width: 20px; 
                 height: 20px;
                 position: absolute;
-                transition: all .3s linear 0ms;
-                -webkit-transition: all .3s linear 0ms;
-                -moz-transition: all .3s linear 0ms;
-                -o-transition: all .3s linear 0ms;
-                background-color: #DDDDDD;
+                transition: all .2s linear 0ms;
+                -webkit-transition: all .2s linear 0ms;
+                -moz-transition: all .2s linear 0ms;
+                -o-transition: all .2s linear 0ms;
+                background-color: #D7D400;
                 z-index: 101;
             }
             .snakeHead {
-                background-color: #FFDDDD;
+                background-color: #26C506;
 
             }
             .apple {
@@ -268,9 +292,15 @@
                 width: 20px; 
                 height: 20px;
                 position: absolute;
-                background-color: #DDFFDD;
+                background-color: #FF6868;
                 z-index: 100;
             }
+			.field {
+				display: inline-block;
+				position: relative;
+				border: 1px solid black;
+				transition: all 200ms ease-in;
+			}
         </style>
     </body>
 </html>
