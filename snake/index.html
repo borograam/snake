@@ -5,7 +5,7 @@
     </head>
     <body>
         <div id="field1" class="field"></div>
-		<div id="field2" class="field"></div>
+        <div id="field2" class="field"></div>
         <script>            
             class Vertex {
                 constructor(x, y) {
@@ -35,13 +35,13 @@
                         }
                     }
                 }
-				objOfReachedConnections(steps=0) {
-					let ret = {};
-					for(let key in this.connections) {
-						if(this.connections[key].canReach(steps)) ret[key] = this.connections[key];
-					}
-					return ret;
-				}
+                objOfReachedConnections(steps=0) {
+                    let ret = {};
+                    for(let key in this.connections) {
+                        if(this.connections[key].canReach(steps)) ret[key] = this.connections[key];
+                    }
+                    return ret;
+                }
                 clear() {
                     this.el = null;
                     this.type = "none";
@@ -49,8 +49,8 @@
                 canReach(steps=0) {
                     if (!this.el) return true;
                     if (this.type === "apple") return true;
-					if (this.type === "snake" || this.type === "head")
-						return this.el.list.length - this.el.index < steps + 1;
+                    if (this.type === "snake" || this.type === "head")
+                        return this.el.list.length - this.el.index < steps + 1;
                     return false;
                 }
                 copyStateTo(vertex) {
@@ -89,23 +89,23 @@
             class Controller {
                 constructor(obj) {
                     if (!obj || !obj.rows || !obj.cols || !obj.wrap) throw new Error();
-					this.elWidth = 20;
-					this.elHeight = 20;
+                    this.elWidth = 20;
+                    this.elHeight = 20;
                     this.rows = obj.rows;
                     this.cols = obj.cols;
                     this.wrap = obj.wrap;
                     this.list = [];
                     this.apple = null;  // apple vertex
                     
-					this.wrap.innerHTML = '';
-					this.wrap.style.width = this.elWidth * this.cols;
-					this.wrap.style.height = this.elHeight * this.rows;
+                    this.wrap.innerHTML = '';
+                    this.wrap.style.width = this.elWidth * this.cols;
+                    this.wrap.style.height = this.elHeight * this.rows;
                     this.initList();  // list of snake parts (divs)
                     this.createApple(this.graph.randomEmptyVertex());
                     this.actionQueue = [];
                     this.writeTopLeft();
                 }
-				
+                
                 createDiv(vertex, classes=[]) {
                     let div = document.createElement('div');
                     for(let cls of classes) div.classList.add(cls);
@@ -140,15 +140,15 @@
                 createSnakeHead(vertex) {
                     let div = this.createDiv(vertex, ['snakePart', 'snakeHead']);
                     vertex.type == "head";
-					this.list = [div];
-					div.list = this.list;
-					div.index = 0;
+                    this.list = [div];
+                    div.list = this.list;
+                    div.index = 0;
                     return div;
                 }
                 createSnakeTail(vertex) {
                     let div = this.createSnakePart(vertex);
-					div.list = this.list;
-					div.index = this.list.length;
+                    div.list = this.list;
+                    div.index = this.list.length;
                     this.list.push(div);
                     return div;
                 }
@@ -172,9 +172,9 @@
                     while(vertexQueue.length){
                         let cur = vertexQueue.shift();
                         if (cur.v === vertexTo) break;
-						let curConn = cur.v.objOfReachedConnections(cur.steps);
+                        let curConn = cur.v.objOfReachedConnections(cur.steps);
                         for (let action in curConn) {
-							let next = curConn[action];
+                            let next = curConn[action];
                             if (!visited[next]) {
                                 vertexQueue.push({v: next, steps: cur.steps + 1});
                                 visited[next] = true;
@@ -262,13 +262,13 @@
                 wrap: document.getElementById('field1')
             });
             let interval1 = setInterval("c1.step()", 100);
-			
-			/*let c2 = new Controller({
-				rows: 30,
-				cols: 35,
-				wrap: document.getElementById('field2')
-			});
-			let interval2 = setInterval("c2.step()", 200);*/
+            
+            /*let c2 = new Controller({
+                rows: 30,
+                cols: 35,
+                wrap: document.getElementById('field2')
+            });
+            let interval2 = setInterval("c2.step()", 200);*/
         </script>
         <style>
             .snakePart {
@@ -295,12 +295,12 @@
                 background-color: #FF6868;
                 z-index: 100;
             }
-			.field {
-				display: inline-block;
-				position: relative;
-				border: 1px solid black;
-				transition: all 200ms ease-in;
-			}
+            .field {
+                display: inline-block;
+                position: relative;
+                border: 1px solid black;
+                transition: all 200ms ease-in;
+            }
         </style>
     </body>
 </html>
